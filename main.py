@@ -1,19 +1,29 @@
 import os
 import time
+from rich.console import Console
+from rich.panel import Panel
+from rich.prompt import Prompt
+from rich.text import Text
+from rich import print as rprint
+
+# Importando nossos padrões de projeto
 from factories.item_factory import ItemFactory
 from decorators.adicionais import Leite, Chantilly
 from pagamentos.strategy import PagamentoPix, PagamentoCartao
 from observers.observer import GerenciadorPreparo, PainelCliente
 
+# Inicializando o console do Rich para cores e painéis
+console = Console()
+
 def limpar_tela():
-    """Função auxiliar para limpar o terminal e deixar o visual limpo"""
     os.system('cls' if os.name == 'nt' else 'clear')
 
 def exibir_cabecalho():
     limpar_tela()
-    print("╔══════════════════════════════════════════════╗")
-    print("║          ☕ CAFETERIA PATTERNS ☕            ║")
-    print("╚══════════════════════════════════════════════╝\n")
+    titulo = Text("☕ CAFETERIA CAFÉ TERIA ☕\n", justify="center", style="bold cyan")
+    titulo.append("Sistema Arquitetural de Pedidos", style="italic white")
+    console.print(Panel(titulo, border_style="cyan", padding=(1, 2)))
+    print()
 
 def main():
     # ==========================================
@@ -22,11 +32,12 @@ def main():
     pedido = None
     while True:
         exibir_cabecalho()
-        print("▶ ESCOLHA SUA BEBIDA BASE:")
-        print("  [1] Café Espresso (R$ 5.00)")
-        print("  [2] Cappuccino Tradicional (R$ 8.50)")
+        console.print("[bold yellow]▶ ESCOLHA SUA BEBIDA BASE:[/bold yellow]")
+        console.print("  [cyan][1][/cyan] Café Espresso ([green]R$ 5.00[/green])")
+        console.print("  [cyan][2][/cyan] Cappuccino Tradicional ([green]R$ 8.50[/green])")
         
-        opcao = input("\nDigite o número da opção desejada: ")
+        # Usando o Prompt do Rich que já formata e valida a entrada
+        opcao = Prompt.ask("\n[bold white]Digite o número da opção desejada[/bold white]", choices=["1", "2"])
         
         if opcao == "1":
             pedido = ItemFactory.criar_item("espresso")
@@ -34,36 +45,34 @@ def main():
         elif opcao == "2":
             pedido = ItemFactory.criar_item("cappuccino")
             break
-        else:
-            print("❌ Opção inválida! Tente novamente.")
-            time.sleep(1)
 
     # ==========================================
     # ETAPA 2: ESCOLHER ADICIONAIS (DECORATOR)
     # ==========================================
     while True:
         exibir_cabecalho()
-        print(f"🛒 PEDIDO ATUAL: {pedido.get_nome()} | R$ {pedido.get_preco():.2f}\n")
-        print("▶ DESEJA INCLUIR ADICIONAIS?")
-        print("  [1] + Leite (R$ 2.00)")
-        print("  [2] + Chantilly (R$ 3.50)")
-        print("  [0] ➡ FINALIZAR PEDIDO")
         
-        opcao = input("\nDigite o número da opção desejada: ")
+        # Painel flutuante mostrando o pedido atual
+        resumo_atual = f"[bold]Item:[/bold] {pedido.get_nome()}\n[bold]Valor Atual:[/bold] [green]R$ {pedido.get_preco():.2f}[/green]"
+        console.print(Panel(resumo_atual, title="🛒 Carrinho", border_style="yellow", width=60))
+        
+        console.print("\n[bold yellow]▶ DESEJA INCLUIR ADICIONAIS?[/bold yellow]")
+        console.print("  [cyan][1][/cyan] + Leite ([green]R$ 2.00[/green])")
+        console.print("  [cyan][2][/cyan] + Chantilly ([green]R$ 3.50[/green])")
+        console.print("  [red][0][/red] ➡ FINALIZAR PEDIDO")
+        
+        opcao = Prompt.ask("\n[bold white]Digite a opção[/bold white]", choices=["1", "2", "0"])
         
         if opcao == "1":
-            pedido = Leite(pedido) # Decora com leite
-            print("✅ Leite adicionado!")
+            pedido = Leite(pedido)
+            console.print("[bold green]✅ Leite adicionado![/bold green]")
             time.sleep(0.5)
         elif opcao == "2":
-            pedido = Chantilly(pedido) # Decora com chantilly
-            print("✅ Chantilly adicionado!")
+            pedido = Chantilly(pedido)
+            console.print("[bold green]✅ Chantilly adicionado![/bold green]")
             time.sleep(0.5)
         elif opcao == "0":
             break
-        else:
-            print("❌ Opção inválida! Tente novamente.")
-            time.sleep(1)
 
     total = pedido.get_preco()
 
@@ -73,15 +82,15 @@ def main():
     estrategia_pagamento = None
     while True:
         exibir_cabecalho()
-        print("🧾 RESUMO DO PEDIDO")
-        print(f"Item: {pedido.get_nome()}")
-        print(f"Total a Pagar: R$ {total:.2f}")
-        print("------------------------------------------------")
-        print("▶ ESCOLHA A FORMA DE PAGAMENTO:")
-        print("  [1] PIX (Aprovação imediata)")
-        print("  [2] Cartão de Crédito")
         
-        opcao = input("\nDigite a forma de pagamento: ")
+        recibo = f"[bold]Pedido final:[/bold] {pedido.get_nome()}\n[bold]Total a Pagar:[/bold] [green]R$ {total:.2f}[/green]"
+        console.print(Panel(recibo, title="🧾 Recibo", border_style="green", width=60))
+        
+        console.print("\n[bold yellow]▶ ESCOLHA A FORMA DE PAGAMENTO:[/bold yellow]")
+        console.print("  [cyan][1][/cyan] PIX (Aprovação imediata)")
+        console.print("  [cyan][2][/cyan] Cartão de Crédito")
+        
+        opcao = Prompt.ask("\n[bold white]Digite a forma de pagamento[/bold white]", choices=["1", "2"])
         
         if opcao == "1":
             estrategia_pagamento = PagamentoPix()
@@ -89,43 +98,39 @@ def main():
         elif opcao == "2":
             estrategia_pagamento = PagamentoCartao()
             break
-        else:
-            print("❌ Opção inválida! Tente novamente.")
-            time.sleep(1)
 
-    # Processa o pagamento de fato
     exibir_cabecalho()
-    print("⏳ Processando pagamento...")
-    time.sleep(2)
-    print(f"\n{estrategia_pagamento.processar_pagamento(total)}")
+    with console.status("[bold yellow]Processando pagamento com o banco...[/bold yellow]", spinner="dots"):
+        time.sleep(2) # Simula o tempo de transação
+    
+    resultado_pagamento = estrategia_pagamento.processar_pagamento(total)
+    console.print(f"\n[bold green]✅ {resultado_pagamento}[/bold green]")
     time.sleep(2)
 
     # ==========================================
     # ETAPA 4: PREPARO E NOTIFICAÇÃO (OBSERVER)
     # ==========================================
     exibir_cabecalho()
-    print("👨‍🍳 Pedido enviado para o Barista!")
-    print("Acompanhe o status pelo painel...\n")
-    print("------------------------------------------------")
+    console.print(Panel("[bold cyan]👨‍🍳 Pedido enviado para o Barista!\nAcompanhe o status pelo painel abaixo...[/bold cyan]", border_style="blue"))
+    print("\n")
     
-    # Configurando os Observadores
     gerenciador = GerenciadorPreparo()
     painel_loja = PainelCliente()
-    
     gerenciador.inscrever(painel_loja)
     
-    # Simulando o preparo do café
-    time.sleep(1)
-    gerenciador.set_status("Em preparo... ☕")
+    # Simulação do preparo com animações de carregamento do Rich
+    with console.status("[bold yellow]Iniciando preparo...[/bold yellow]", spinner="bouncingBar"):
+        time.sleep(1)
+        gerenciador.set_status("Em preparo... ☕")
+        
+        time.sleep(2)
+        gerenciador.set_status("Finalizando detalhes... ✨")
+        
+        time.sleep(2)
+        gerenciador.set_status(f"[bold green]PRONTO! Pode retirar seu {pedido.get_nome()}! 🎉[/bold green]")
     
-    time.sleep(3) # Espera 3 segundos
-    gerenciador.set_status("Finalizando detalhes... ✨")
-    
-    time.sleep(2) # Espera 2 segundos
-    gerenciador.set_status(f"PRONTO! Pode retirar seu {pedido.get_nome()}! 🎉")
-    
-    print("------------------------------------------------")
-    print("\n✅ OBRIGADO POR COMPRAR NA CAFETERIA PATTERNS!")
+    print("\n")
+    console.print(Panel("[bold white]✅ OBRIGADO POR COMPRAR NA CAFETERIA CAFÉ TERIA![/bold white]", style="on green"))
     print("\n")
 
 if __name__ == "__main__":
