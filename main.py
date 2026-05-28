@@ -7,10 +7,10 @@ from rich.text import Text
 from rich import print as rprint
 
 # Importando nossos padrões de projeto
-from factories.item_factory import ItemFactory
-from decorators.adicionais import Leite, Chantilly
-from pagamentos.strategy import PagamentoPix, PagamentoCartao
-from observers.observer import GerenciadorPreparo, PainelCliente
+from backend.domain.factories.item_factory import ItemFactory
+from backend.domain.decorators.adicionais import Leite, Chantilly
+from backend.domain.fechamento_conta.strategy import PagamentoPix, PagamentoCartao
+from backend.domain.observers.observer import GerenciadorPreparo, PainelCliente
 
 # Inicializando o console do Rich para cores e painéis
 console = Console()
