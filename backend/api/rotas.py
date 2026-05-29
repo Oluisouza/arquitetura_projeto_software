@@ -2,6 +2,8 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from backend.use_cases.gerenciar_pedido import CriarPedidoUseCase
 from backend.domain.fechamento_conta.strategy import FechamentoPix, FechamentoCartao, FechamentoDinheiro
+from backend.domain.pedido.carrinho import PedidoCliente
+from backend.domain.cozinha.fila_pedidos import FilaDePedidosDaCozinha
 
 app = FastAPI(
     title="API Cafeteria PDV",
@@ -17,6 +19,7 @@ class RequisicaoPedido(BaseModel):
 class RequisicaoPagamento(BaseModel):
     valor_total: float
     metodo_pagamento: str 
+    nome_cliente: str
 
 @app.post("/pedidos/novo")
 def criar_novo_pedido(requisicao: RequisicaoPedido):
@@ -55,6 +58,12 @@ def pagar_pedido(requisicao: RequisicaoPagamento):
         raise HTTPException(status_code=400, detail="Método de pagamento inválido.")
 
     mensagem_fechamento = estrategia.finalizar_conta(requisicao.valor_total)
+
+    fila_cozinha = FilaDePedidosDaCozinha()
+
+    pedido_fechado = PedidoCliente(requisicao.nome_cliente)
+
+    fila_cozinha.receber_pedido(pedido_fechado)
 
 
     return {"mensagem": mensagem_fechamento}
