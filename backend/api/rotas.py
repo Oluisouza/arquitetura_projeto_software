@@ -1,4 +1,5 @@
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from backend.use_cases.gerenciar_pedido import CriarPedidoUseCase
 from backend.domain.fechamento_conta.strategy import FechamentoPix, FechamentoCartao, FechamentoDinheiro
@@ -11,6 +12,15 @@ app = FastAPI(
     description="Microsserviço de Atendimento (PDV) - Arquitetura Limpa",
     version="1.0.0"
 )
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+    
 
 class RequisicaoPedido(BaseModel):
     nome_cliente: str
