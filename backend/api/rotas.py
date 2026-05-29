@@ -4,6 +4,7 @@ from backend.use_cases.gerenciar_pedido import CriarPedidoUseCase
 from backend.domain.fechamento_conta.strategy import FechamentoPix, FechamentoCartao, FechamentoDinheiro
 from backend.domain.pedido.carrinho import PedidoCliente
 from backend.domain.cozinha.fila_pedidos import FilaDePedidosDaCozinha
+from backend.infra.repositorios.pedido_repository import PedidoRepository
 
 app = FastAPI(
     title="API Cafeteria PDV",
@@ -43,7 +44,7 @@ def criar_novo_pedido(requisicao: RequisicaoPedido):
 @app.post("/pedidos/pagar")
 def pagar_pedido(requisicao: RequisicaoPagamento):
     """
-    Rota para o PDV processar o pagamento usando o Padrão Strategy.
+    Rota para o PDV processar o pagamento usando o Padrão Strategy e persistir no DB.
     """
     metodo = requisicao.metodo_pagamento.lower()
     estrategia = None
@@ -57,13 +58,29 @@ def pagar_pedido(requisicao: RequisicaoPagamento):
     else:
         raise HTTPException(status_code=400, detail="Método de pagamento inválido.")
 
+    # Executa a ação do Strategy
     mensagem_fechamento = estrategia.finalizar_conta(requisicao.valor_total)
 
-    fila_cozinha = FilaDePedidosDaCozinha()
-
-    pedido_fechado = PedidoCliente(requisicao.nome_cliente)
-
+    # INTEGRAÇÃO COM A COZINHA (Fila Singleton em Memória)
+    fila_cozinha = FilaDePedidosDaCozinha() 
+    pedido_fechado = PedidoCliente(requisicao.nome_cliente) 
     fila_cozinha.receber_pedido(pedido_fechado)
 
+    # ==========================================
+    # PERSISTÊNCIA NA NUVEM (Padrão Repository)
+    # ==========================================
+    try:
+        repo = PedidoRepository()
+        pedido_salvo = repo.salvar_pedido_pago(
+            nome_cliente=requisicao.nome_cliente,
+            item_preparado="Pedido Customizado",
+            total=requisicao.valor_total,
+            metodo=metodo
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erro ao salvar no banco: {str(e)}")
 
-    return {"mensagem": mensagem_fechamento}
+    return {
+        "mensagem": mensagem_fechamento,
+        "id_pedido_banco": pedido_salvo["id"]
+    }
