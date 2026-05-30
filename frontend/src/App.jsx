@@ -25,7 +25,7 @@ function App() {
     setStatus('Calculando pedido...')
     
     try {
-      const resposta = await fetch('http://127.0.0.1:8000/pedidos/novo', {
+      const resposta = await fetch('https://cefeteria-cafe-teria.onrender.com/pedidos/novo', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -47,7 +47,7 @@ function App() {
     setStatus('Processando com o banco...')
     
     try {
-      const resposta = await fetch('http://127.0.0.1:8000/pedidos/pagar', {
+      const resposta = await fetch('https://cefeteria-cafe-teria.onrender.com/pedidos/pagar', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
