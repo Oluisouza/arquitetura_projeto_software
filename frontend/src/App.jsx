@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Coffee, Plus, Trash2, Send, CreditCard, Banknote, QrCode, CheckCircle2 } from 'lucide-react';
-import './index.css'; 
+import './index.css';
 
 function App() {
   const [cliente, setCliente] = useState('Mesa 01');
@@ -10,6 +10,13 @@ function App() {
   const [carrinho, setCarrinho] = useState([]);
   const [resumoBackend, setResumoBackend] = useState(null);
   const [status, setStatus] = useState('');
+
+  const precosPreview = {
+    espresso: 5.00,
+    cappuccino: 8.50,
+    leite: 2.00,
+    chantilly: 3.50
+  };
 
   const toggleAdicional = (item) => {
     if (adicionais.includes(item)) {
@@ -25,7 +32,7 @@ function App() {
       return;
     }
     const novoItem = {
-      id: Date.now(), 
+      id: Date.now(),
       bebida_base: bebidaBase,
       adicionais: [...adicionais]
     };
@@ -42,14 +49,25 @@ function App() {
     setResumoBackend(null);
   };
 
+  const calcularSubtotalEstimado = () => {
+    let subtotal = 0;
+    carrinho.forEach(item => {
+      subtotal += precosPreview[item.bebida_base] || 0;
+      item.adicionais.forEach(adic => {
+        subtotal += precosPreview[adic] || 0;
+      });
+    });
+    return subtotal;
+  };
+
   const enviarParaCaixa = async () => {
     if (carrinho.length === 0) {
       alert('O carrinho está vazio!');
       return;
     }
-    setStatus('Calculando...');
+    setStatus('Calculando no servidor...');
     try {
-      const resposta = await fetch('https://cefeteria-cafe-teria.onrender.com/pedidos/novo', {
+      const resposta = await fetch('http://127.0.0.1:8000/pedidos/novo', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -57,11 +75,18 @@ function App() {
           itens: carrinho 
         })
       });
+      
       const data = await resposta.json();
+
+      if (!resposta.ok) {
+        setStatus('❌ Erro no Python. Verifique o terminal.');
+        return;
+      }
+
       setResumoBackend(data.dados);
       setStatus('Conta fechada. Aguardando pagamento.');
     } catch (erro) {
-      setStatus('Erro de conexão com o servidor.');
+      setStatus('❌ Erro de conexão com o servidor.');
     }
   };
 
@@ -69,7 +94,7 @@ function App() {
     if (!resumoBackend) return;
     setStatus('Processando com o banco...');
     try {
-      const resposta = await fetch('https://cefeteria-cafe-teria.onrender.com/pedidos/pagar', {
+      const resposta = await fetch('http://127.0.0.1:8000/pedidos/pagar', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -78,7 +103,14 @@ function App() {
           nome_cliente: cliente
         })
       });
+      
       const data = await resposta.json();
+
+      if (!resposta.ok) {
+        setStatus(`❌ Erro no pagamento: ${data.detail}`);
+        return;
+      }
+
       setStatus(`Pagamento Aprovado! ID: ${data.id_pedido_banco}`);
       
       setTimeout(() => {
@@ -88,20 +120,27 @@ function App() {
         setCliente('Mesa ' + Math.floor(Math.random() * 100));
       }, 6000);
     } catch (erro) {
-      setStatus('Erro ao processar pagamento.');
+      setStatus('❌ Erro ao processar pagamento.');
     }
   };
+
+  const subtotalAtual = calcularSubtotalEstimado();
 
   return (
     <div className="app-container">
       <header className="header">
         <div className="header-logo">
-          <Coffee size={32} color="#8B5E3C" />
-          <h1 className="logo-text">Cafeteria Patterns</h1>
+          <img 
+            src="/logo.png" 
+            alt="Logo da Cafeteria" 
+            style={{ height: '140px', width: 'auto', borderRadius: '8px', objectFit: 'cover' }} 
+            onError={(e) => { e.target.style.display = 'none' }}
+          />
         </div>
         {status && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#C9A84C', fontWeight: '600' }}>
-            <CheckCircle2 size={20} /> {status}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: status.includes('❌') ? 'red' : '#C9A84C', fontWeight: '600' }}>
+            {status.includes('❌') ? null : <CheckCircle2 size={20} />} 
+            {status}
           </div>
         )}
       </header>
@@ -185,10 +224,18 @@ function App() {
           </div>
 
           <div style={{ marginTop: '24px', borderTop: '1px solid #eee', paddingTop: '24px' }}>
+            
+            {carrinho.length > 0 && !resumoBackend && (
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '16px', color: '#666', fontSize: '16px' }}>
+                <span>Subtotal Atual:</span>
+                <span style={{ fontWeight: '600' }}>R$ {subtotalAtual.toFixed(2)}</span>
+              </div>
+            )}
+
             {resumoBackend ? (
               <>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-                  <h3 style={{ margin: 0 }}>Total</h3>
+                  <h3 style={{ margin: 0 }}>Total Oficial</h3>
                   <h2 style={{ margin: 0, color: '#C9A84C' }}>R$ {resumoBackend.total_a_pagar.toFixed(2)}</h2>
                 </div>
                 
@@ -212,7 +259,7 @@ function App() {
                 disabled={carrinho.length === 0}
                 style={{ opacity: carrinho.length === 0 ? 0.5 : 1 }}
               >
-                <Send size={20} /> Calcular Total da Mesa
+                <Send size={20} /> Confirmar & Fechar Mesa
               </button>
             )}
           </div>
