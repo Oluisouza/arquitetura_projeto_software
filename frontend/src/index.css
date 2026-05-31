@@ -1,0 +1,124 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Playfair+Display:ital,wght@0,600;1,600&display=swap');
+
+:root {
+  --bg-creamy: #FDFAF6;
+  --bg-beige: #F5EFE6;
+  --color-caramel: #8B5E3C;
+  --color-gold: #C9A84C;
+  --color-white: #FFFFFF;
+  --color-text: #333333;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background-color: var(--bg-creamy);
+  font-family: 'Inter', sans-serif;
+  color: var(--color-text);
+  -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3, .logo-text {
+  font-family: 'Playfair Display', serif;
+  color: var(--color-caramel);
+}
+
+.app-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid var(--color-gold);
+  padding-bottom: 16px;
+  margin-bottom: 24px;
+}
+
+.header-logo {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 1.5rem;
+}
+
+.main-layout {
+  display: flex;
+  gap: 24px;
+  flex-direction: row;
+}
+
+@media (max-width: 768px) {
+  .main-layout {
+    flex-direction: column;
+  }
+}
+
+.card {
+  background-color: var(--color-white);
+  border-radius: 12px;
+  padding: 24px;
+  box-shadow: 0 4px 12px rgba(139, 94, 60, 0.08); /* Sombra suave cor de caramelo */
+}
+
+.btn {
+  min-height: 48px;
+  border-radius: 8px;
+  font-family: 'Inter', sans-serif;
+  font-size: 16px;
+  font-weight: 500;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: all 0.2s ease;
+  border: none;
+}
+
+.btn-outline {
+  background-color: var(--bg-beige);
+  border: 1px solid var(--color-caramel);
+  color: var(--color-caramel);
+}
+
+.btn-outline.active {
+  background-color: var(--color-caramel);
+  color: var(--color-white);
+}
+
+.btn-primary {
+  background-color: var(--color-caramel);
+  color: var(--color-white);
+  font-weight: 600;
+  width: 100%;
+}
+
+.btn-gold {
+  background-color: var(--color-gold);
+  color: var(--color-white);
+  font-weight: 600;
+  width: 100%;
+}
+
+.input-field {
+  width: 100%;
+  min-height: 48px;
+  padding: 0 16px;
+  border-radius: 8px;
+  border: 1px solid #ccc;
+  font-size: 16px;
+  font-family: 'Inter', sans-serif;
+  background-color: var(--bg-creamy);
+}
+
+.input-field:focus {
+  outline: 2px solid var(--color-caramel);
+}
