@@ -1,16 +1,16 @@
 from backend.domain.itens.base import ItemCafeteria
 
-class Espresso(ItemCafeteria):
+class ItemDinamico(ItemCafeteria):
+    """
+    Esta classe assume a forma (nome e preço)
+    de qualquer item cadastrado no Banco de Dados.
+    """
+    def __init__(self, nome: str, preco: float):
+        self._nome = nome
+        self._preco = preco
+
     def get_nome(self) -> str:
-        return "Café Espresso"
-    
+        return self._nome.capitalize()
+
     def get_preco(self) -> float:
-        return 5.00
-    
-class Cappuccino(ItemCafeteria):
-    def get_nome(self) -> str:
-        return "Cappuccino tradicional"
-    
-    def get_preco(self) -> float:
-        return 8.50
-    
+        return float(self._preco)

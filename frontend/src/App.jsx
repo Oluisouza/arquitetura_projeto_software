@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Coffee, Plus, Trash2, Send, CreditCard, Banknote, QrCode, CheckCircle2 } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Coffee, Plus, Trash2, Send, CreditCard, Banknote, QrCode, CheckCircle2, Croissant } from 'lucide-react';
 import './index.css';
 
 function App() {
@@ -11,24 +11,56 @@ function App() {
   const [resumoBackend, setResumoBackend] = useState(null);
   const [status, setStatus] = useState('');
 
-  const precosPreview = {
-    espresso: 5.00,
-    cappuccino: 8.50,
-    leite: 2.00,
-    chantilly: 3.50
+  const [cardapio, setCardapio] = useState({ bebida: [], adicional: [], comida: [] });
+
+  useEffect(() => {
+    const buscarCardapio = async () => {
+      try {
+        const resposta = await fetch('https://cefeteria-cafe-teria.onrender.com/cardapio');
+        const data = await resposta.json();
+        
+        if (resposta.ok && data.dados) {
+          const bebidas = data.dados.filter(p => p.categoria === 'bebida');
+          const adicionais = data.dados.filter(p => p.categoria === 'adicional');
+          const comidas = data.dados.filter(p => p.categoria === 'comida');
+          
+          setCardapio({ bebida: bebidas, adicional: adicionais, comida: comidas });
+        }
+      } catch (error) {
+        setStatus('❌ Erro ao carregar o cardápio do servidor.');
+      }
+    };
+
+    buscarCardapio();
+  }, []);
+
+  const calcularSubtotalEstimado = () => {
+    let subtotal = 0;
+    const todosProdutos = [...cardapio.bebida, ...cardapio.adicional, ...cardapio.comida];
+    
+    carrinho.forEach(item => {
+      const prodBase = todosProdutos.find(p => p.nome === item.bebida_base);
+      if (prodBase) subtotal += prodBase.preco;
+      
+      item.adicionais.forEach(adic => {
+        const prodAdic = todosProdutos.find(p => p.nome === adic);
+        if (prodAdic) subtotal += prodAdic.preco;
+      });
+    });
+    return subtotal;
   };
 
-  const toggleAdicional = (item) => {
-    if (adicionais.includes(item)) {
-      setAdicionais(adicionais.filter((a) => a !== item));
+  const toggleAdicional = (itemNome) => {
+    if (adicionais.includes(itemNome)) {
+      setAdicionais(adicionais.filter((a) => a !== itemNome));
     } else {
-      setAdicionais([...adicionais, item]);
+      setAdicionais([...adicionais, itemNome]);
     }
   };
 
   const adicionarAoCarrinho = () => {
     if (!bebidaBase) {
-      alert('Selecione um café primeiro!');
+      alert('Selecione um item base primeiro!');
       return;
     }
     const novoItem = {
@@ -49,17 +81,6 @@ function App() {
     setResumoBackend(null);
   };
 
-  const calcularSubtotalEstimado = () => {
-    let subtotal = 0;
-    carrinho.forEach(item => {
-      subtotal += precosPreview[item.bebida_base] || 0;
-      item.adicionais.forEach(adic => {
-        subtotal += precosPreview[adic] || 0;
-      });
-    });
-    return subtotal;
-  };
-
   const enviarParaCaixa = async () => {
     if (carrinho.length === 0) {
       alert('O carrinho está vazio!');
@@ -67,7 +88,7 @@ function App() {
     }
     setStatus('Calculando no servidor...');
     try {
-      const resposta = await fetch('http://127.0.0.1:8000/pedidos/novo', {
+      const resposta = await fetch('https://cefeteria-cafe-teria.onrender.com/pedidos/novo', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -94,7 +115,7 @@ function App() {
     if (!resumoBackend) return;
     setStatus('Processando com o banco...');
     try {
-      const resposta = await fetch('http://127.0.0.1:8000/pedidos/pagar', {
+      const resposta = await fetch('https://cefeteria-cafe-teria.onrender.com/pedidos/pagar', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -132,10 +153,11 @@ function App() {
         <div className="header-logo">
           <img 
             src="/logo.png" 
-            alt="Logo da Cafeteria" 
-            style={{ height: '140px', width: 'auto', borderRadius: '8px', objectFit: 'cover' }} 
+            alt="Logo" 
+            style={{ height: '120px', width: 'auto', borderRadius: '8px', objectFit: 'cover' }} 
             onError={(e) => { e.target.style.display = 'none' }}
           />
+          <h1 className="logo-text">Café Teria</h1> 
         </div>
         {status && (
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: status.includes('❌') ? 'red' : '#C9A84C', fontWeight: '600' }}>
@@ -149,7 +171,7 @@ function App() {
         
         <section className="card" style={{ flex: 3 }}>
           <h2>Novo Item</h2>
-          <p style={{ color: '#666', marginBottom: '24px' }}>Identificação e montagem da bebida.</p>
+          <p style={{ color: '#666', marginBottom: '24px' }}>Identificação e montagem do pedido.</p>
 
           <div style={{ marginBottom: '24px' }}>
             <label style={{ display: 'block', marginBottom: '8px', fontWeight: '500' }}>Cliente ou Mesa</label>
@@ -163,35 +185,49 @@ function App() {
 
           <h3 style={{ marginBottom: '12px', fontSize: '18px' }}>1. Escolha a Bebida Base</h3>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '24px' }}>
-            <button 
-              className={`btn btn-outline ${bebidaBase === 'espresso' ? 'active' : ''}`}
-              onClick={() => setBebidaBase('espresso')}
-            >
-              <Coffee size={20} /> Espresso (R$ 5)
-            </button>
-            <button 
-              className={`btn btn-outline ${bebidaBase === 'cappuccino' ? 'active' : ''}`}
-              onClick={() => setBebidaBase('cappuccino')}
-            >
-              <Coffee size={20} /> Cappuccino (R$ 8.50)
-            </button>
+            {cardapio.bebida.map((bebida) => (
+              <button 
+                key={bebida.id}
+                className={`btn btn-outline ${bebidaBase === bebida.nome ? 'active' : ''}`}
+                onClick={() => setBebidaBase(bebida.nome)}
+                style={{ textTransform: 'capitalize' }}
+              >
+                <Coffee size={20} /> {bebida.nome} (R$ {bebida.preco.toFixed(2)})
+              </button>
+            ))}
           </div>
 
           <h3 style={{ marginBottom: '12px', fontSize: '18px' }}>2. Adicionais (Opcional)</h3>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '32px' }}>
-            <button 
-              className={`btn btn-outline ${adicionais.includes('leite') ? 'active' : ''}`}
-              onClick={() => toggleAdicional('leite')}
-            >
-              <Plus size={20} /> Leite (+R$ 2)
-            </button>
-            <button 
-              className={`btn btn-outline ${adicionais.includes('chantilly') ? 'active' : ''}`}
-              onClick={() => toggleAdicional('chantilly')}
-            >
-              <Plus size={20} /> Chantilly (+R$ 3.50)
-            </button>
+            {cardapio.adicional.map((adic) => (
+              <button 
+                key={adic.id}
+                className={`btn btn-outline ${adicionais.includes(adic.nome) ? 'active' : ''}`}
+                onClick={() => toggleAdicional(adic.nome)}
+                style={{ textTransform: 'capitalize' }}
+              >
+                <Plus size={20} /> {adic.nome} (+R$ {adic.preco.toFixed(2)})
+              </button>
+            ))}
           </div>
+
+          {cardapio.comida.length > 0 && (
+            <>
+              <h3 style={{ marginBottom: '12px', fontSize: '18px' }}>3. Comidas / Acompanhamentos</h3>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '32px' }}>
+                {cardapio.comida.map((comida) => (
+                  <button 
+                    key={comida.id}
+                    className={`btn btn-outline ${bebidaBase === comida.nome ? 'active' : ''}`}
+                    onClick={() => setBebidaBase(comida.nome)}
+                    style={{ textTransform: 'capitalize' }}
+                  >
+                    <Croissant size={20} /> {comida.nome} (R$ {comida.preco.toFixed(2)})
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
 
           <button className="btn btn-primary" onClick={adicionarAoCarrinho}>
             Adicionar à Bandeja
