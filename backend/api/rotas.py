@@ -6,6 +6,7 @@ from backend.domain.fechamento_conta.strategy import FechamentoPix, FechamentoCa
 from backend.domain.pedido.carrinho import PedidoCliente
 from backend.domain.cozinha.fila_pedidos import FilaDePedidosDaCozinha
 from backend.infra.repositorios.pedido_repository import PedidoRepository
+from backend.infra.repositorios.produto_repository import ProdutoRepository
 
 app = FastAPI(
     title="API Cafeteria PDV",
@@ -20,12 +21,14 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-    
+
+class ItemRequisicao(BaseModel):
+    bebida_base: str
+    adicionais: list[str] = []    
 
 class RequisicaoPedido(BaseModel):
     nome_cliente: str
-    bebida_base: str
-    adicionais: list[str] = [] 
+    itens: list[ItemRequisicao]
 
 class RequisicaoPagamento(BaseModel):
     valor_total: float
@@ -42,8 +45,7 @@ def criar_novo_pedido(requisicao: RequisicaoPedido):
         
         resultado = use_case.executar(
             nome_cliente=requisicao.nome_cliente,
-            bebida_base=requisicao.bebida_base,
-            adicionais=requisicao.adicionais
+            itens_carrinho=[item.model_dump() for item in requisicao.itens]
         )
         
         return {"mensagem": "Pedido criado com sucesso!", "dados": resultado}
@@ -94,3 +96,15 @@ def pagar_pedido(requisicao: RequisicaoPagamento):
         "mensagem": mensagem_fechamento,
         "id_pedido_banco": pedido_salvo["id"]
     }
+
+@app.get("/cardapio")
+def obter_cardapio():
+    """
+    Retorna todos os produtos cadastrados no banco para o React montar os botões.
+    """
+    try:
+        repo = ProdutoRepository()
+        produtos = repo.listar_produtos()
+        return {"mensagem": "Cardápio carregado", "dados": produtos}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erro ao buscar cardápio: {str(e)}")
