@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Coffee, Plus, Trash2, Send, CreditCard, Banknote, QrCode, CheckCircle2, Croissant } from 'lucide-react';
+import { Coffee, Plus, Trash2, Send, CreditCard, Banknote, QrCode, CheckCircle2, Croissant, CupSoda } from 'lucide-react';
 import './index.css';
 
 function App() {
@@ -11,33 +11,42 @@ function App() {
   const [resumoBackend, setResumoBackend] = useState(null);
   const [status, setStatus] = useState('');
 
-  const [cardapio, setCardapio] = useState({ bebida: [], adicional: [], comida: [] });
+  const [todosProdutos, setTodosProdutos] = useState([]);
 
   useEffect(() => {
     const buscarCardapio = async () => {
       try {
-        const resposta = await fetch('https://cefeteria-cafe-teria.onrender.com/cardapio');
+        const resposta = await fetch('https://cefeteria-cafe-teria.onrender.com/cardapio'); 
         const data = await resposta.json();
         
         if (resposta.ok && data.dados) {
-          const bebidas = data.dados.filter(p => p.categoria === 'bebida');
-          const adicionais = data.dados.filter(p => p.categoria === 'adicional');
-          const comidas = data.dados.filter(p => p.categoria === 'comida');
-          
-          setCardapio({ bebida: bebidas, adicional: adicionais, comida: comidas });
+          setTodosProdutos(data.dados);
         }
       } catch (error) {
         setStatus('❌ Erro ao carregar o cardápio do servidor.');
       }
     };
-
     buscarCardapio();
   }, []);
 
+  // Separa os produtos para desenhar os botões na tela
+  const cafes = todosProdutos.filter(p => p.categoria === 'cafe');
+  const sucos = todosProdutos.filter(p => p.categoria === 'suco');
+  const comidas = todosProdutos.filter(p => p.categoria === 'comida');
+
+  const produtoSelecionado = todosProdutos.find(p => p.nome === bebidaBase);
+  let adicionaisDisponiveis = [];
+  
+  if (produtoSelecionado) {
+    if (produtoSelecionado.categoria === 'cafe') {
+      adicionaisDisponiveis = todosProdutos.filter(p => p.categoria === 'adicional_cafe');
+    } else if (produtoSelecionado.categoria === 'suco') {
+      adicionaisDisponiveis = todosProdutos.filter(p => p.categoria === 'adicional_suco');
+    }
+  }
+
   const calcularSubtotalEstimado = () => {
     let subtotal = 0;
-    const todosProdutos = [...cardapio.bebida, ...cardapio.adicional, ...cardapio.comida];
-    
     carrinho.forEach(item => {
       const prodBase = todosProdutos.find(p => p.nome === item.bebida_base);
       if (prodBase) subtotal += prodBase.preco;
@@ -88,22 +97,17 @@ function App() {
     }
     setStatus('Calculando no servidor...');
     try {
-      const resposta = await fetch('https://cefeteria-cafe-teria.onrender.com/pedidos/novo', {
+      const resposta = await fetch('https://cefeteria-cafe-teria.onrender.com/pedidos/novo', { 
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          nome_cliente: cliente,
-          itens: carrinho 
-        })
+        body: JSON.stringify({ nome_cliente: cliente, itens: carrinho })
       });
       
       const data = await resposta.json();
-
       if (!resposta.ok) {
         setStatus('❌ Erro no Python. Verifique o terminal.');
         return;
       }
-
       setResumoBackend(data.dados);
       setStatus('Conta fechada. Aguardando pagamento.');
     } catch (erro) {
@@ -115,7 +119,7 @@ function App() {
     if (!resumoBackend) return;
     setStatus('Processando com o banco...');
     try {
-      const resposta = await fetch('https://cefeteria-cafe-teria.onrender.com/pedidos/pagar', {
+      const resposta = await fetch('https://cefeteria-cafe-teria.onrender.com/pedidos/pagar', { 
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -126,14 +130,11 @@ function App() {
       });
       
       const data = await resposta.json();
-
       if (!resposta.ok) {
         setStatus(`❌ Erro no pagamento: ${data.detail}`);
         return;
       }
-
       setStatus(`Pagamento Aprovado! ID: ${data.id_pedido_banco}`);
-      
       setTimeout(() => {
         setCarrinho([]);
         setResumoBackend(null);
@@ -154,7 +155,7 @@ function App() {
           <img 
             src="/logo.png" 
             alt="Logo" 
-            style={{ height: '120px', width: 'auto', borderRadius: '8px', objectFit: 'cover' }} 
+            style={{ height: '48px', width: 'auto', borderRadius: '8px', objectFit: 'cover' }} 
             onError={(e) => { e.target.style.display = 'none' }}
           />
           <h1 className="logo-text">Café Teria</h1> 
@@ -168,7 +169,6 @@ function App() {
       </header>
 
       <div className="main-layout">
-        
         <section className="card" style={{ flex: 3 }}>
           <h2>Novo Item</h2>
           <p style={{ color: '#666', marginBottom: '24px' }}>Identificação e montagem do pedido.</p>
@@ -183,13 +183,13 @@ function App() {
             />
           </div>
 
-          <h3 style={{ marginBottom: '12px', fontSize: '18px' }}>1. Escolha a Bebida Base</h3>
+          <h3 style={{ marginBottom: '12px', fontSize: '18px' }}>1. Cafés</h3>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '24px' }}>
-            {cardapio.bebida.map((bebida) => (
+            {cafes.map((bebida) => (
               <button 
                 key={bebida.id}
                 className={`btn btn-outline ${bebidaBase === bebida.nome ? 'active' : ''}`}
-                onClick={() => setBebidaBase(bebida.nome)}
+                onClick={() => { setBebidaBase(bebida.nome); setAdicionais([]); }} 
                 style={{ textTransform: 'capitalize' }}
               >
                 <Coffee size={20} /> {bebida.nome} (R$ {bebida.preco.toFixed(2)})
@@ -197,32 +197,56 @@ function App() {
             ))}
           </div>
 
-          <h3 style={{ marginBottom: '12px', fontSize: '18px' }}>2. Adicionais (Opcional)</h3>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '32px' }}>
-            {cardapio.adicional.map((adic) => (
-              <button 
-                key={adic.id}
-                className={`btn btn-outline ${adicionais.includes(adic.nome) ? 'active' : ''}`}
-                onClick={() => toggleAdicional(adic.nome)}
-                style={{ textTransform: 'capitalize' }}
-              >
-                <Plus size={20} /> {adic.nome} (+R$ {adic.preco.toFixed(2)})
-              </button>
-            ))}
-          </div>
+          {sucos.length > 0 && (
+            <>
+              <h3 style={{ marginBottom: '12px', fontSize: '18px' }}>2. Sucos & Bebidas Frias</h3>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '24px' }}>
+                {sucos.map((suco) => (
+                  <button 
+                    key={suco.id}
+                    className={`btn btn-outline ${bebidaBase === suco.nome ? 'active' : ''}`}
+                    onClick={() => { setBebidaBase(suco.nome); setAdicionais([]); }}
+                    style={{ textTransform: 'capitalize' }}
+                  >
+                    <CupSoda size={20} /> {suco.nome} (R$ {suco.preco.toFixed(2)})
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
 
-          {cardapio.comida.length > 0 && (
+          {comidas.length > 0 && (
             <>
               <h3 style={{ marginBottom: '12px', fontSize: '18px' }}>3. Comidas / Acompanhamentos</h3>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '32px' }}>
-                {cardapio.comida.map((comida) => (
+                {comidas.map((comida) => (
                   <button 
                     key={comida.id}
                     className={`btn btn-outline ${bebidaBase === comida.nome ? 'active' : ''}`}
-                    onClick={() => setBebidaBase(comida.nome)}
+                    onClick={() => { setBebidaBase(comida.nome); setAdicionais([]); }}
                     style={{ textTransform: 'capitalize' }}
                   >
                     <Croissant size={20} /> {comida.nome} (R$ {comida.preco.toFixed(2)})
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+
+          {adicionaisDisponiveis.length > 0 && (
+            <>
+              <h3 style={{ marginBottom: '12px', fontSize: '18px', borderTop: '1px solid #eee', paddingTop: '16px' }}>
+                Personalize seu(sua) {produtoSelecionado.nome.charAt(0).toUpperCase() + produtoSelecionado.nome.slice(1)}
+              </h3>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '32px' }}>
+                {adicionaisDisponiveis.map((adic) => (
+                  <button 
+                    key={adic.id}
+                    className={`btn btn-outline ${adicionais.includes(adic.nome) ? 'active' : ''}`}
+                    onClick={() => toggleAdicional(adic.nome)}
+                    style={{ textTransform: 'capitalize' }}
+                  >
+                    <Plus size={20} /> {adic.nome} (+R$ {adic.preco.toFixed(2)})
                   </button>
                 ))}
               </div>
@@ -275,7 +299,7 @@ function App() {
                   <h2 style={{ margin: 0, color: '#C9A84C' }}>R$ {resumoBackend.total_a_pagar.toFixed(2)}</h2>
                 </div>
                 
-                <p style={{ marginBottom: '12px', fontWeight: '500' }}>Finalizar Pagamento:</p>
+                <p style={{ marginBottom: '12px', fontWeight: '500' }}>Confirmar Forma de Pagamento:</p>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                   <button className="btn btn-gold" onClick={() => pagarPedido('pix')}>
                     <QrCode size={20} /> PIX

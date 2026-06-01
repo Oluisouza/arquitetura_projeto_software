@@ -29,7 +29,7 @@ def main():
             console.print("\n[bold yellow]--- NOVO PRODUTO ---[/bold yellow]")
             nome = Prompt.ask("Nome do Produto (ex: Croissant)")
             preco_str = Prompt.ask("Preço (ex: 12.50)")
-            categoria = Prompt.ask("Categoria", choices=["bebida", "adicional", "comida"])
+            categoria = Prompt.ask("Categoria", choices=["cafe", "suco", "comida", "adicional_cafe", "adicional_suco"])
             
             try:
                 preco = float(preco_str.replace(",", "."))
