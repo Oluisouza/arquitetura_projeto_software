@@ -5,7 +5,6 @@ import {
   CreditCard, Banknote, Plus, Minus
 } from 'lucide-react';
 
-// Função auxiliar para gerar imagens baseadas na categoria
 const getImagem = (categoria) => {
   if (categoria === 'cafe') return 'https://images.unsplash.com/photo-1534778101976-62847782c213?w=400&h=300&fit=crop';
   if (categoria === 'suco') return 'https://images.unsplash.com/photo-1622483767028-3f66f32aef97?w=400&h=300&fit=crop';
@@ -14,9 +13,7 @@ const getImagem = (categoria) => {
 };
 
 function App() {
-  // ==========================================
-  // ESTADOS DO REACT
-  // ==========================================
+
   const [cliente, setCliente] = useState('Mesa 01');
   const [carrinho, setCarrinho] = useState([]);
   const [resumoBackend, setResumoBackend] = useState(null);
@@ -25,7 +22,6 @@ function App() {
   const [categoriaAtiva, setCategoriaAtiva] = useState('todos');
   const [termoBusca, setTermoBusca] = useState('');
   
-  // Estados do Modal
   const [modalAberto, setModalAberto] = useState(false);
   const [produtoModal, setProdutoModal] = useState(null);
   const [adicionaisModal, setAdicionaisModal] = useState([]);
@@ -33,7 +29,6 @@ function App() {
 
   const API_URL = import.meta.env.VITE_API_URL
 
-  // Busca o cardápio dinâmico
   useEffect(() => {
     const buscarCardapio = async () => {
       try {
@@ -49,9 +44,6 @@ function App() {
     buscarCardapio();
   }, []);
 
-  // ==========================================
-  // LÓGICA DE FILTRO E BUSCA
-  // ==========================================
   const produtosFiltrados = todosProdutos.filter(p => {
     const ehProdutoBase = !p.categoria.startsWith('adicional_');
     const matchesCategoria = categoriaAtiva === 'todos' || p.categoria === categoriaAtiva;
@@ -59,9 +51,6 @@ function App() {
     return ehProdutoBase && matchesCategoria && matchesBusca;
   });
 
-  // ==========================================
-  // LÓGICA DO CARRINHO (AGRUPADO)
-  // ==========================================
   const abrirModal = (produto) => {
     setProdutoModal(produto);
     setAdicionaisModal([]);
@@ -75,7 +64,6 @@ function App() {
       adicionaisFinais.push(tamanhoSelecionado);
     }
 
-    // Criar uma chave única para agrupamento (Nome + Tamanho + Adicionais ordenados)
     const chaveUnica = `${produtoModal.nome}-${tamanhoSelecionado}-${adicionaisModal.sort().join(',')}`;
     
     const itemExistente = carrinho.find(item => item.chaveUnica === chaveUnica);
@@ -117,9 +105,7 @@ function App() {
     setResumoBackend(null);
   };
 
-  // ==========================================
-  // CÁLCULOS
-  // ==========================================
+
   const calcularPrecoModal = () => {
     if (!produtoModal) return 0;
     let total = produtoModal.preco;
@@ -141,14 +127,10 @@ function App() {
 
   const subtotalEstimado = carrinho.reduce((acc, item) => acc + (item.precoUnitario * item.quantidade), 0);
 
-  // ==========================================
-  // INTEGRAÇÃO BACKEND
-  // ==========================================
   const enviarParaCaixa = async () => {
     if (carrinho.length === 0) return;
     setStatus('Calculando no servidor...');
     try {
-      // Formata os itens para o formato que o backend espera (se necessário)
       const itensParaBackend = carrinho.flatMap(item => 
         Array(item.quantidade).fill({
           bebida_base: item.bebida_base,
@@ -184,7 +166,8 @@ function App() {
         body: JSON.stringify({
           valor_total: resumoBackend.total_a_pagar,
           metodo_pagamento: metodo,
-          nome_cliente: cliente
+          nome_cliente: cliente,
+          item_preparado: resumoBackend.item_preparado
         })
       });
       
@@ -211,7 +194,6 @@ function App() {
   return (
     <div className="bg-gray-50 h-screen flex overflow-hidden font-sans">
       
-      {/* SIDEBAR */}
       <aside className="w-20 bg-white border-r flex flex-col items-center py-6 gap-8 z-10 shadow-sm">
         <div className="w-12 h-12 bg-amber-900 rounded-2xl flex items-center justify-center text-white shadow-md hover:scale-105 transition-all cursor-pointer">
           <Coffee size={24} />
@@ -226,7 +208,6 @@ function App() {
         </div>
       </aside>
 
-      {/* ÁREA CENTRAL */}
       <main className="flex-1 flex flex-col min-w-0">
         <header className="h-24 bg-white border-b px-8 flex items-center justify-between shadow-sm z-10">
           <div>
@@ -250,7 +231,6 @@ function App() {
           </div>
         </header>
 
-        {/* CATEGORIAS */}
         <div className="flex-1 overflow-hidden flex flex-col">
           <div className="px-8 bg-white flex gap-8 border-b overflow-x-auto no-scrollbar">
             {['todos', 'cafe', 'suco', 'comida'].map(cat => (
@@ -264,7 +244,6 @@ function App() {
             ))}
           </div>
 
-          {/* GRID DE PRODUTOS */}
           <div className="flex-1 overflow-y-auto p-8 bg-[#FDFAF6] custom-scrollbar">
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
               {produtosFiltrados.map(p => (
@@ -292,7 +271,6 @@ function App() {
         </div>
       </main>
 
-      {/* CARRINHO */}
       <aside className="w-96 bg-white border-l flex flex-col shadow-2xl z-10">
         <div className="p-6 border-b">
           <h2 className="text-xl font-bold text-gray-800 mb-4">Pedido Atual</h2>
@@ -371,7 +349,6 @@ function App() {
         </div>
       </aside>
 
-      {/* MODAL */}
       {modalAberto && produtoModal && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-3xl w-full max-w-lg overflow-hidden shadow-2xl">

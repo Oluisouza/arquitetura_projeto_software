@@ -7,6 +7,7 @@ from backend.domain.pedido.carrinho import PedidoCliente
 from backend.domain.cozinha.fila_pedidos import FilaDePedidosDaCozinha
 from backend.infra.repositorios.pedido_repository import PedidoRepository
 from backend.infra.repositorios.produto_repository import ProdutoRepository
+import os
 
 app = FastAPI(
     title="API Cafeteria PDV",
@@ -14,12 +15,14 @@ app = FastAPI(
     version="1.0.0"
 )
 
+FRONTEND_URL = os.environ.get("FRONTEND_URL", "http://localhost:5173")
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=False,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origins=[FRONTEND_URL],
+    allow_credentials=True,
+    allow_methods=["GET", "POST"],
+    allow_headers=["Content-Type"],
 )
 
 class ItemRequisicao(BaseModel):
@@ -34,6 +37,7 @@ class RequisicaoPagamento(BaseModel):
     valor_total: float
     metodo_pagamento: str 
     nome_cliente: str
+    item_preparado: str = "Pedido"
 
 @app.post("/pedidos/novo")
 def criar_novo_pedido(requisicao: RequisicaoPedido):
@@ -85,7 +89,7 @@ def pagar_pedido(requisicao: RequisicaoPagamento):
         repo = PedidoRepository()
         pedido_salvo = repo.salvar_pedido_pago(
             nome_cliente=requisicao.nome_cliente,
-            item_preparado="Pedido Customizado",
+            item_preparado=requisicao.item_preparado,
             total=requisicao.valor_total,
             metodo=metodo
         )
