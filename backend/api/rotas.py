@@ -63,7 +63,7 @@ def criar_novo_pedido(requisicao: RequisicaoPedido):
         raise HTTPException(status_code=400, detail=str(e))
     
 @app.post("/pedidos/pagar")
-def pagar_pedido(requisicao: RequisicaoPagamento):
+async def pagar_pedido(requisicao: RequisicaoPagamento):
     """
     Rota para o PDV processar o pagamento usando o Padrão Strategy e persistir no DB.
     """
@@ -81,10 +81,9 @@ def pagar_pedido(requisicao: RequisicaoPagamento):
 
     mensagem_fechamento = estrategia.finalizar_conta(requisicao.valor_total)
 
-    fila_cozinha = FilaDePedidosDaCozinha() 
-    pedido_fechado = PedidoCliente(requisicao.nome_cliente) 
+    fila_cozinha = FilaDePedidosDaCozinha()
+    pedido_fechado = PedidoCliente(requisicao.nome_cliente)
     fila_cozinha.receber_pedido(pedido_fechado)
-
 
     try:
         repo = PedidoRepository()
@@ -97,8 +96,18 @@ def pagar_pedido(requisicao: RequisicaoPagamento):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Erro ao salvar no banco: {str(e)}")
 
+    # Notifica a cozinha via SSE que um novo pedido chegou
+    await sse_manager.emitir("pedido_novo", {
+        "id":             pedido_salvo["id"],
+        "nome_cliente":   pedido_salvo["nome_cliente"],
+        "item_preparado": pedido_salvo["item_preparado"],
+        "total_pago":     pedido_salvo["total_pago"],
+        "status":         pedido_salvo["status"],
+        "criado_em":      pedido_salvo["criado_em"],
+    })
+
     return {
-        "mensagem": mensagem_fechamento,
+        "mensagem":       mensagem_fechamento,
         "id_pedido_banco": pedido_salvo["id"]
     }
 
