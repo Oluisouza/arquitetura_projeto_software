@@ -1,6 +1,7 @@
 from backend.infra.database import get_db_conexao
+from backend.domain.interfaces.repositorios import IProdutoRepository
 
-class ProdutoRepository:
+class ProdutoRepository(IProdutoRepository):
     """
     Padrão Repository: Lida com a tabela de Produtos do Cardápio.
     """
@@ -9,13 +10,13 @@ class ProdutoRepository:
 
     def adicionar_produto(self, nome: str, preco: float, categoria: str):
         dados = {
-            "nome": nome.lower(), # Salva sempre em minúsculo para facilitar a busca
+            "nome": nome.lower(), 
             "preco": preco,
             "categoria": categoria.lower()
         }
         resposta = self.db.table("produtos").insert(dados).execute()
         return resposta.data[0]
 
-    def listar_produtos(self):
+    def listar_produtos(self) -> list:
         resposta = self.db.table("produtos").select("*").execute()
         return resposta.data
