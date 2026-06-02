@@ -66,7 +66,7 @@ export default function PDV() {
         }
     }, [carrinho.length, pedidosProntos.length])
 
-    // ── Polling de status dos pedidos (a cada 10s) ────────────
+    // ── Busca inicial dos contadores ─────────────────────────
     useEffect(() => {
         const buscarStatus = async () => {
             try {
@@ -74,11 +74,8 @@ export default function PDV() {
                 if (!resposta.ok) return
                 const data = await resposta.json()
                 setContagemStatus(data)
-
                 if (data.pedidos_prontos) {
-                    console.log('prontos recebidos:', data.pedidos_prontos)
                     setPedidosProntos(data.pedidos_prontos)
-                    console.log('estado pedidosProntos atualizado:', data.pedidos_prontos.length)
                     for (const pedido of data.pedidos_prontos) {
                         const id = String(pedido.id)
                         if (!idsNotificados.current.has(id)) {
@@ -91,10 +88,42 @@ export default function PDV() {
             } catch {
             }
         }
-
         buscarStatus()
-        const intervalo = setInterval(buscarStatus, 10000)
-        return () => clearInterval(intervalo)
+    }, [])
+
+    // ── SSE — atualiza contadores e notifica prontos ──────────
+    useEffect(() => {
+        const source = new EventSource(`${API_URL}/pedidos/stream`)
+
+        source.addEventListener('status_atualizado', (e) => {
+            const evento = JSON.parse(e.data)
+
+            fetch(`${API_URL}/pedidos/status`)
+                .then(r => r.json())
+                .then(data => {
+                    setContagemStatus(data)
+
+                    if (data.pedidos_prontos) {
+                        setPedidosProntos(data.pedidos_prontos)
+
+                        for (const pedido of data.pedidos_prontos) {
+                            const id = String(pedido.id)
+                            if (!idsNotificados.current.has(id)) {
+                                idsNotificados.current.add(id)
+                                exibirNotificacao(pedido.nome_cliente)
+                                break
+                            }
+                        }
+                    }
+                })
+                .catch(() => { })
+        })
+
+        source.onerror = () => {
+            console.log('SSE PDV: reconectando...')
+        }
+
+        return () => source.close()
     }, [])
 
     const exibirNotificacao = (nomePedido) => {
