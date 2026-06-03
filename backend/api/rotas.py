@@ -9,6 +9,8 @@ from backend.infra.repositorios.pedido_repository import PedidoRepository
 from backend.infra.repositorios.produto_repository import ProdutoRepository
 from fastapi.responses import StreamingResponse
 from backend.infra.sse_manager import sse_manager
+from backend.infra.database import get_db_conexao
+from fastapi import FastAPI, HTTPException, UploadFile
 import os
 
 app = FastAPI(
@@ -23,7 +25,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=[FRONTEND_URL],
     allow_credentials=True,
-    allow_methods=["GET", "POST", "PATCH"],
+    allow_methods=["GET", "POST", "PATCH", "PUT"],
     allow_headers=["Content-Type"],
 )
 
@@ -43,6 +45,36 @@ class RequisicaoPagamento(BaseModel):
 
 class RequisicaoStatus(BaseModel):
     status: str
+
+class RequisicaoProduto(BaseModel):
+    nome:       str
+    preco:      float
+    categoria:  str
+    imagem_url: str = None
+
+@app.post("/produtos")
+def criar_produto(requisicao: RequisicaoProduto):
+    """
+    Cria um novo produto no cardápio.
+    Usado pela tela Admin.
+    """
+    try:
+        repo = ProdutoRepository()
+        produto = repo.adicionar_produto(
+            nome=requisicao.nome,
+            preco=requisicao.preco,
+            categoria=requisicao.categoria,
+        )
+        if requisicao.imagem_url:
+            supabase_db = get_db_conexao()
+            supabase_db.table("produtos").update(
+                {"imagem_url": requisicao.imagem_url}
+            ).eq("id", produto["id"]).execute()
+            produto["imagem_url"] = requisicao.imagem_url
+
+        return {"mensagem": "Produto criado com sucesso!", "dados": produto}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/pedidos/novo")
 def criar_novo_pedido(requisicao: RequisicaoPedido):
@@ -221,3 +253,49 @@ async def stream_pedidos():
             "Access-Control-Allow-Origin": "*",
         },
     )
+
+@app.post("/produtos/upload-imagem")
+async def upload_imagem(arquivo: UploadFile):
+    try:
+        db       = get_db_conexao()
+        conteudo = await arquivo.read()
+        ext      = arquivo.filename.split('.')[-1]
+        caminho  = f"{int(__import__('time').time())}.{ext}"
+
+        print(f">>> Tentando upload: {caminho}, tamanho: {len(conteudo)} bytes")
+
+        db.storage.from_("imagens-produtos").upload(
+            caminho, conteudo,
+            {"content-type": arquivo.content_type, "upsert": "true"}
+        )
+
+        print(">>> Upload ok, buscando URL...")
+
+        url = db.storage.from_("imagens-produtos").get_public_url(caminho)
+
+        print(f">>> URL gerada: {url}")
+
+        return {"url": url}
+    except Exception as e:
+        print(f">>> ERRO NO UPLOAD: {type(e).__name__}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.put("/produtos/{produto_id}")
+async def editar_produto(produto_id: str, requisicao: RequisicaoProduto):
+    """Edita um produto existente."""
+    try:
+        db = get_db_conexao()
+        payload = {
+            "nome":      requisicao.nome,
+            "preco":     requisicao.preco,
+            "categoria": requisicao.categoria,
+        }
+        if requisicao.imagem_url:
+            payload["imagem_url"] = requisicao.imagem_url
+
+        resposta = db.table("produtos").update(payload).eq("id", produto_id).execute()
+        return {"mensagem": "Produto atualizado!", "dados": resposta.data[0]}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
