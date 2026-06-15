@@ -5,6 +5,7 @@ import {
     Banknote, CheckCircle, Bell, X, ChevronUp, ChevronDown
 } from 'lucide-react'
 import ProdutoCard from '../components/ProdutoCard'
+import { apiFetch } from '../lib/api'
 
 const API_URL = import.meta.env.VITE_API_URL
 
@@ -217,9 +218,8 @@ export default function PDV() {
 
     const entregarPedido = async (pedidoId) => {
         try {
-            await fetch(`${API_URL}/pedidos/${pedidoId}/status`, {
+            await apiFetch(`/pedidos/${pedidoId}/status`, {
                 method: 'PATCH',
-                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ status: 'Entregue' }),
             })
             setPedidosProntos(prev => prev.filter(p => p.id !== pedidoId))
@@ -239,9 +239,8 @@ export default function PDV() {
                     adicionais: item.adicionais,
                 })
             )
-            const resposta = await fetch(`${API_URL}/pedidos/novo`, {
+            const resposta = await apiFetch(`/pedidos/novo`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ nome_cliente: cliente, itens: itensParaBackend }),
             })
             const data = await resposta.json()
@@ -260,9 +259,8 @@ export default function PDV() {
         if (!resumoBackend) return
         setStatus('Processando pagamento...')
         try {
-            const resposta = await fetch(`${API_URL}/pedidos/pagar`, {
+            const resposta = await apiFetch(`/pedidos/pagar`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     valor_total: resumoBackend.total_a_pagar,
                     metodo_pagamento: metodo,

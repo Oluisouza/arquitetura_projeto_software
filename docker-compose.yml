@@ -1,0 +1,19 @@
+services:
+  backend:
+    build: .
+    container_name: cafeteria-backend
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        VITE_API_URL: http://localhost:8000
+    container_name: cafeteria-frontend
+    ports:
+      - "5173:80"
+    depends_on:
+      - backend

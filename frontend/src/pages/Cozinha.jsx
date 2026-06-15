@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Coffee, ArrowLeft } from 'lucide-react'
+import { apiFetch } from '../lib/api'
 
 const API_URL = import.meta.env.VITE_API_URL
 
@@ -105,9 +106,8 @@ export default function Cozinha() {
 
   const atualizarStatus = async (pedidoId, novoStatus) => {
     try {
-      await fetch(`${API_URL}/pedidos/${pedidoId}/status`, {
+      await apiFetch(`/pedidos/${pedidoId}/status`, {
         method:  'PATCH',
-        headers: { 'Content-Type': 'application/json' },
         body:    JSON.stringify({ status: novoStatus }),
       })
       if (novoStatus === 'Entregue') {

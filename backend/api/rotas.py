@@ -1,17 +1,18 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, UploadFile, Depends
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
+import os
+
 from backend.use_cases.gerenciar_pedido import CriarPedidoUseCase
 from backend.domain.fechamento_conta.strategy import FechamentoPix, FechamentoCartao, FechamentoDinheiro
 from backend.domain.pedido.carrinho import PedidoCliente
 from backend.domain.cozinha.fila_pedidos import FilaDePedidosDaCozinha
 from backend.infra.repositorios.pedido_repository import PedidoRepository
 from backend.infra.repositorios.produto_repository import ProdutoRepository
-from fastapi.responses import StreamingResponse
 from backend.infra.sse_manager import sse_manager
 from backend.infra.database import get_db_conexao
-from fastapi import FastAPI, HTTPException, UploadFile
-import os
+from backend.api.autenticacao import router as auth_router, requer_papel
 
 app = FastAPI(
     title="API Cafeteria PDV",
@@ -19,19 +20,24 @@ app = FastAPI(
     version="1.0.0"
 )
 
-FRONTEND_URL = os.environ.get("FRONTEND_URL", "http://localhost:5173")
+app.include_router(auth_router)
+
+origens = ["http://localhost:5173"]
+if os.environ.get("FRONTEND_URL"):
+    origens.append(os.environ["FRONTEND_URL"])
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[FRONTEND_URL],
+    allow_origins=origens,
     allow_credentials=True,
-    allow_methods=["GET", "POST", "PATCH", "PUT"],
-    allow_headers=["Content-Type"],
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
+
 
 class ItemRequisicao(BaseModel):
     bebida_base: str
-    adicionais: list[str] = []    
+    adicionais: list[str] = []
 
 class RequisicaoPedido(BaseModel):
     nome_cliente: str
@@ -39,7 +45,7 @@ class RequisicaoPedido(BaseModel):
 
 class RequisicaoPagamento(BaseModel):
     valor_total: float
-    metodo_pagamento: str 
+    metodo_pagamento: str
     nome_cliente: str
     item_preparado: str = "Pedido"
 
@@ -52,11 +58,12 @@ class RequisicaoProduto(BaseModel):
     categoria:  str
     imagem_url: str = None
 
-@app.post("/produtos")
+
+@app.post("/produtos", dependencies=[Depends(requer_papel("gerente"))])
 def criar_produto(requisicao: RequisicaoProduto):
     """
     Cria um novo produto no cardápio.
-    Usado pela tela Admin.
+    Usado pela tela Admin. Protegido: apenas gerente.
     """
     try:
         repo = ProdutoRepository()
@@ -76,25 +83,25 @@ def criar_produto(requisicao: RequisicaoProduto):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.post("/pedidos/novo")
+@app.post("/pedidos/novo", dependencies=[Depends(requer_papel("atendente", "gerente"))])
 def criar_novo_pedido(requisicao: RequisicaoPedido):
     """
-    Rota para o Tablet (React) enviar um novo pedido.
+    Rota para o Tablet enviar um novo pedido.
     """
     try:
         use_case = CriarPedidoUseCase()
-        
+
         resultado = use_case.executar(
             nome_cliente=requisicao.nome_cliente,
             itens_carrinho=[item.model_dump() for item in requisicao.itens]
         )
-        
+
         return {"mensagem": "Pedido criado com sucesso!", "dados": resultado}
-    
+
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
-    
-@app.post("/pedidos/pagar")
+
+@app.post("/pedidos/pagar", dependencies=[Depends(requer_papel("atendente", "gerente"))])
 async def pagar_pedido(requisicao: RequisicaoPagamento):
     """
     Rota para o PDV processar o pagamento usando o Padrão Strategy e persistir no DB.
@@ -128,7 +135,6 @@ async def pagar_pedido(requisicao: RequisicaoPagamento):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Erro ao salvar no banco: {str(e)}")
 
-    # Notifica a cozinha via SSE que um novo pedido chegou
     await sse_manager.emitir("pedido_novo", {
         "id":             pedido_salvo["id"],
         "nome_cliente":   pedido_salvo["nome_cliente"],
@@ -169,7 +175,10 @@ def obter_status_cozinha():
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.patch("/pedidos/{pedido_id}/status")
+@app.patch(
+    "/pedidos/{pedido_id}/status",
+    dependencies=[Depends(requer_papel("atendente", "cozinha", "gerente"))],
+)
 async def atualizar_status_pedido(pedido_id: str, body: RequisicaoStatus):
     """
     Atualiza o status de um pedido e notifica todos os clientes SSE.
@@ -186,7 +195,6 @@ async def atualizar_status_pedido(pedido_id: str, body: RequisicaoStatus):
         if not pedido:
             raise HTTPException(status_code=404, detail="Pedido não encontrado.")
 
-        # Notifica todos os clientes SSE conectados
         await sse_manager.emitir("status_atualizado", {
             "id":           pedido_id,
             "status":       body.status,
@@ -213,7 +221,7 @@ def obter_cardapio():
         return {"mensagem": "Cardápio carregado", "dados": produtos}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Erro ao buscar cardápio: {str(e)}")
-    
+
 @app.get("/pedidos/cozinha")
 def listar_pedidos_cozinha():
     """
@@ -227,13 +235,11 @@ def listar_pedidos_cozinha():
         return {"dados": ativos}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-    
+
 @app.get("/pedidos/stream")
 async def stream_pedidos():
     """
     Rota SSE — abre uma conexão persistente com o cliente.
-    O browser recebe eventos em tempo real quando pedidos mudam de status.
-    Implementa o padrão Observer no contexto web.
     """
     fila = sse_manager.conectar()
 
@@ -249,12 +255,12 @@ async def stream_pedidos():
         media_type="text/event-stream",
         headers={
             "Cache-Control":               "no-cache",
-            "X-Accel-Buffering":           "no",    # essencial para Nginx/Render
+            "X-Accel-Buffering":           "no",   
             "Access-Control-Allow-Origin": "*",
         },
     )
 
-@app.post("/produtos/upload-imagem")
+@app.post("/produtos/upload-imagem", dependencies=[Depends(requer_papel("gerente"))])
 async def upload_imagem(arquivo: UploadFile):
     try:
         db       = get_db_conexao()
@@ -280,9 +286,9 @@ async def upload_imagem(arquivo: UploadFile):
         print(f">>> ERRO NO UPLOAD: {type(e).__name__}: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.put("/produtos/{produto_id}")
+@app.put("/produtos/{produto_id}", dependencies=[Depends(requer_papel("gerente"))])
 async def editar_produto(produto_id: str, requisicao: RequisicaoProduto):
-    """Edita um produto existente."""
+    """Edita um produto existente. Protegido: apenas gerente."""
     try:
         db = get_db_conexao()
         payload = {
@@ -297,5 +303,3 @@ async def editar_produto(produto_id: str, requisicao: RequisicaoProduto):
         return {"mensagem": "Produto atualizado!", "dados": resposta.data[0]}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-
-
