@@ -558,7 +558,7 @@ export default function PDV() {
                                     </button>
                                 </div>
                                 <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-                                    <CarrinhoConteudo />
+                                    {CarrinhoConteudo()}
                                 </div>
                             </div>
                         </div>
@@ -645,7 +645,7 @@ export default function PDV() {
 
                     {/* Carrinho desktop */}
                     <aside style={{ gridArea: 'cart', background: 'white', borderLeft: '1px solid var(--border-s)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-                        <CarrinhoConteudo />
+                        {CarrinhoConteudo()}
                     </aside>
                 </div>
             )}
