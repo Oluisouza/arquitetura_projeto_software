@@ -4,14 +4,14 @@ Sistema de Ponto de Venda (PDV) para cafeteria, desenvolvido como trabalho final
 da disciplina de Arquitetura e Projeto de Software.
 
 O projeto demonstra na prática a aplicação de **Clean Architecture**, princípios
-**SOLID**, seis padrões de projeto **GoF**, **TDD**, **BDD** e uma arquitetura de
-**microsserviços** containerizada — integrados em um sistema funcional com
-frontend React, backend FastAPI e banco de dados PostgreSQL na nuvem.
+**SOLID**, seis padrões de projeto **GoF**, **TDD**, **BDD**, **autenticação com
+níveis de acesso** e uma arquitetura de **microsserviços** containerizada —
+integrados em um sistema funcional com frontend React, backend FastAPI e banco de
+dados PostgreSQL na nuvem.
 
 **Sistema em produção:**
 - Frontend: https://pdv-cafeteria-cafe-teria.onrender.com
-- Backend: https://cefeteria-cafe-teria.onrender.com
-
+- Backend: https://cafeteria-backend-4u4k.onrender.com
 ---
 
 ## 🏗️ Arquitetura
@@ -36,6 +36,7 @@ cafeteria_patterns/
 │   └── nginx.conf        # Roteamento SPA (React Router)
 ├── db/
 │   ├── schema.sql        # Criação das tabelas
+│   ├── auth.sql          # Tabela de perfis + trigger (níveis de acesso)
 │   └── seed.sql          # Dados mockados para rodar localmente
 ├── tests/                # Testes unitários (pytest/unittest)
 ├── features/             # Testes de comportamento BDD (Gherkin/behave)
@@ -125,6 +126,39 @@ flowchart LR
 
 ---
 
+## 🔐 Autenticação e níveis de acesso
+
+O acesso é controlado por três papéis, cada um com sua tela inicial:
+
+| Papel | Tela | Acesso |
+|---|---|---|
+| `gerente`   | `/admin`    | Gestão de produtos + todas as telas |
+| `atendente` | `/` (PDV)   | Atendimento e pagamento |
+| `cozinha`   | `/cozinha`  | Acompanhamento e preparo dos pedidos |
+
+A autenticação usa o **Supabase Auth**, sempre **mediada pelo backend** — o
+frontend nunca fala direto com o Supabase (decisão de projeto: o `supabase-js`
+quebra o build do Vite em produção). O fluxo: o front envia e-mail/senha para
+`POST /auth/login`, o backend autentica e devolve um **JWT** + o papel; o front
+guarda o token e o envia no header `Authorization` das chamadas seguintes.
+
+A autorização acontece em duas camadas:
+- **No frontend**, o componente `RotaProtegida` define quais papéis veem cada
+  tela e redireciona quem não tem acesso.
+- **No backend**, a dependência `requer_papel(...)` valida o JWT e o papel antes
+  das operações sensíveis (criar/editar produtos, registrar e pagar pedidos,
+  mudar status). É essa camada que de fato garante o controle — bloqueio só no
+  front seria burlável.
+
+Uma barra flutuante (`BarraNavegacao`) dá **logout** para qualquer papel logado
+e, **apenas para o gerente**, atalhos para alternar entre PDV, Cozinha e Admin.
+
+Arquivos principais: `backend/api/autenticacao.py`, `db/auth.sql`, e no front
+`context/AuthContext.jsx`, `components/RotaProtegida.jsx`,
+`components/BarraNavegacao.jsx`, `pages/Login.jsx`, `lib/api.js`.
+
+---
+
 ## 🗄️ Banco de dados
 
 O sistema usa **PostgreSQL** (hospedado no Supabase). São apenas duas tabelas.
@@ -155,6 +189,37 @@ Os pedidos pagos. O `status` acompanha o fluxo da cozinha.
 
 **Fluxo de status:** `Na fila da cozinha` → `Em preparo` → `Pronto` → `Entregue`
 
+## 🔐 Autenticação e níveis de acesso
+
+O acesso é controlado por três papéis, cada um com sua tela inicial:
+
+| Papel | Tela | Acesso |
+|---|---|---|
+| `gerente`   | `/admin`    | Gestão de produtos + todas as telas |
+| `atendente` | `/` (PDV)   | Atendimento e pagamento |
+| `cozinha`   | `/cozinha`  | Acompanhamento e preparo dos pedidos |
+
+A autenticação usa o **Supabase Auth**, sempre **mediada pelo backend** — o
+frontend nunca fala direto com o Supabase (decisão de projeto: o `supabase-js`
+quebra o build do Vite em produção). O fluxo: o front envia e-mail/senha para
+`POST /auth/login`, o backend autentica e devolve um **JWT** + o papel; o front
+guarda o token e o envia no header `Authorization` das chamadas seguintes.
+
+A autorização acontece em duas camadas:
+- **No frontend**, o componente `RotaProtegida` define quais papéis veem cada
+  tela e redireciona quem não tem acesso.
+- **No backend**, a dependência `requer_papel(...)` valida o JWT e o papel antes
+  das operações sensíveis (criar/editar produtos, registrar e pagar pedidos,
+  mudar status). É essa camada que de fato garante o controle — bloqueio só no
+  front seria burlável.
+
+Uma barra flutuante (`BarraNavegacao`) dá **logout** para qualquer papel logado
+e, **apenas para o gerente**, atalhos para alternar entre PDV, Cozinha e Admin.
+
+Arquivos principais: `backend/api/autenticacao.py`, `db/auth.sql`, e no front
+`context/AuthContext.jsx`, `components/RotaProtegida.jsx`,
+`components/BarraNavegacao.jsx`, `pages/Login.jsx`, `lib/api.js`.
+
 ### Criação e dados mockados
 
 Os scripts em `db/` criam as tabelas e populam o sistema com um catálogo
@@ -182,6 +247,10 @@ SUPABASE_KEY=sua_anon_key_aqui
 5. (Opcional) Para upload de imagens, crie um bucket público chamado
    `imagens-produtos` em **Storage**. Sem ele, os produtos exibem o
    placeholder padrão.
+
+6. Para o login, rode também `db/auth.sql` e crie os usuários em
+   **Authentication → Add user** (marcando "Auto Confirm"), ajustando o `papel`
+   de cada um na tabela `perfis`.
 
 #### Caminho 2 — 100% local com um comando (Supabase CLI)
 
@@ -327,3 +396,9 @@ A `FilaDePedidosDaCozinha` garante instância única dentro de um processo Pytho
 Com múltiplos workers, cada processo teria sua própria fila. O servidor está
 configurado com um único worker (`--workers 1`) até que a fila seja migrada
 para persistência no banco.
+
+**Por que a autenticação é mediada pelo backend?**
+O `supabase-js` no frontend quebra o build do Vite em produção, então todo o
+contato com o Supabase Auth fica no backend. O front troca e-mail/senha por um
+JWT em `/auth/login` e usa esse token nas chamadas protegidas — isso mantém o
+frontend sem o SDK e concentra a validação de papéis no servidor.
